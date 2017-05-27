@@ -1,12 +1,16 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/huin/goserial"
 )
 
 type shower struct {
@@ -50,41 +54,35 @@ func main() {
 		},
 	}
 	flowrate = 1
-	/*go func() {
-		firmataAdaptor := firmata.NewAdaptor("/dev/ttyACM0")
-
-		sensor := gpio.NewPIRMotionDriver(firmataAdaptor, "7")
-		led := gpio.NewLedDriver(firmataAdaptor, "13")
-
-		work := func() {
-			sensor.On(gpio.MotionDetected, func(data interface{}) {
-				//fmt.Println(gpio.MotionDetected)
-				led.On()
+	go func() {
+		bus, err := goserial.OpenPort(&goserial.Config{
+			Name: "/dev/ttyACM0",
+			Baud: 115200,
+		})
+		if err != nil {
+			panic(err)
+		}
+		scan := bufio.NewScanner(bus)
+		for scan.Scan() {
+			meh := scan.Text()
+			if meh == "1" {
 				if !motion.on {
 					motion.on = true
 					motion.start = time.Now()
+					log.Println("on")
 				}
-			})
-			sensor.On(gpio.MotionStopped, func(data interface{}) {
-				//fmt.Println(gpio.MotionStopped)
-				led.Off()
+			} else {
 				if motion.on {
 					motion.on = false
 					showers.Lock()
 					showers.s = append(showers.s, shower{len: time.Since(motion.start)})
 					showers.Unlock()
+					log.Println("off")
 				}
-			})
+			}
 		}
-
-		robot := gobot.NewRobot("motionBot",
-			[]gobot.Connection{firmataAdaptor},
-			[]gobot.Device{sensor, led},
-			work,
-		)
-
-		robot.Start()
-	}()*/
+		log.Println("Bye bye")
+	}()
 	http.HandleFunc("/setFlow", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "wrong http method", http.StatusBadRequest)
